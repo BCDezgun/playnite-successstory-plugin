@@ -530,12 +530,12 @@ namespace SuccessStory.Views
                     if (Directory.Exists(selectedFolder))
                     {
                         // Look for ShadPS4's specific path structure
-                        string userGameDataPath = Path.Combine(selectedFolder, "user", "game_data");
+                        string userGameDataPath = Path.Combine(selectedFolder, "game_data");
                         if (!Directory.Exists(userGameDataPath))
                         {
                             Logger.Warn($"No valid ShadPS4 game_data folder found in {selectedFolder}");
                             API.Instance.Dialogs.ShowMessage(
-                                "Selected folder must be the ShadPS4 installation directory containing 'user/game_data' path",
+                                "Selected folder must be the ShadPS4 installation directory containing 'game_data' path",
                                 "Invalid Folder",
                                 MessageBoxButton.OK,
                                 MessageBoxImage.Warning

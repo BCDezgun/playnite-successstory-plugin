@@ -18,13 +18,11 @@ using Playnite.SDK.Data;
 
 namespace SuccessStory.Clients
 {
-    
     public class ShadPS4Achievements : GenericAchievements
     {
         private readonly ExophaseAchievements _exophase;
-        // PS4's RTC epoch is January 1, 2008 00:00:00 UTC
-        private static readonly DateTime PS4Epoch = new DateTime(2008, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-        private const int YearOffset = 2007; // The consistent difference we need to subtract
+        // Unix epoch for new ShadPS4 timestamp format
+        private static readonly DateTime UnixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
         public ShadPS4Achievements() : base("ShadPS4")
         {
@@ -38,29 +36,15 @@ namespace SuccessStory.Clients
                 if (string.IsNullOrEmpty(timestamp))
                     return null;
 
-                // Parse the PS4 timestamp
                 ulong tickValue = ulong.Parse(timestamp);
 
-                // Divide by 1000 to get milliseconds instead of microseconds
-                long milliseconds = (long)(tickValue / 1000);
+                // New format: seconds since Unix epoch → convert to milliseconds
+                long milliseconds = (long)(tickValue * 1000);
 
-                // Add milliseconds to PS4 epoch
-                DateTime utcTime = PS4Epoch.AddMilliseconds(milliseconds);
-
-                // Convert to local time
+                DateTime utcTime = UnixEpoch.AddMilliseconds(milliseconds);
                 DateTime localTime = utcTime.ToLocalTime();
 
-                // Adjust the year by subtracting the offset
-                return new DateTime(
-                    localTime.Year - YearOffset,
-                    localTime.Month,
-                    localTime.Day,
-                    localTime.Hour,
-                    localTime.Minute,
-                    localTime.Second,
-                    localTime.Millisecond,
-                    localTime.Kind
-                );
+                return localTime;
             }
             catch (Exception ex)
             {
@@ -111,29 +95,23 @@ namespace SuccessStory.Clients
         {
             GameAchievements gameAchievements = SuccessStory.PluginDatabase.GetDefault(game);
             List<Achievement> AllAchievements = new List<Achievement>();
-
             if (IsConfigured())
             {
-                string userGameDataPath = Path.Combine(PluginDatabase.PluginSettings.Settings.ShadPS4InstallationFolder, "user", "game_data");
+                string userGameDataPath = Path.Combine(PluginDatabase.PluginSettings.Settings.ShadPS4InstallationFolder, "game_data");
                 string titleId = FindGameTitleId(game);
-
                 if (!string.IsNullOrEmpty(titleId))
                 {
                     string trophyPath = Path.Combine(userGameDataPath, titleId, "trophyfiles");
                     string xmlPath = Path.Combine(trophyPath, "trophy00", "Xml", "TROP.XML");
-
                     if (File.Exists(xmlPath))
                     {
                         XDocument trophyXml = XDocument.Load(xmlPath);
                         string gameName = trophyXml.Descendants("title-name").FirstOrDefault()?.Value.Trim();
-
                         // Load cached rarity data
                         RarityCache rarityCache = LoadRarityCache(trophyPath);
                         Dictionary<string, float> trophyRarities = new Dictionary<string, float>();
                         GameAchievements exophaseAchievements = null;
-
                         bool shouldFetchFromExophase = false;
-
                         // Check if we need to fetch from Exophase
                         if (rarityCache == null)
                         {
@@ -147,7 +125,6 @@ namespace SuccessStory.Clients
                         {
                             shouldFetchFromExophase = true;
                         }
-
                         // Only fetch from Exophase if necessary
                         if (shouldFetchFromExophase)
                         {
@@ -155,11 +132,9 @@ namespace SuccessStory.Clients
                             List<SearchResult> searchResults = _exophase.SearchGame(game.Name);
                             SearchResult matchingGame = searchResults?.FirstOrDefault(x =>
                                 x.Platforms.Any(p => p.Contains("PS4", StringComparison.OrdinalIgnoreCase)));
-
                             if (matchingGame != null)
                             {
                                 exophaseAchievements = _exophase.GetAchievements(game, matchingGame);
-
                                 // Create new cache
                                 rarityCache = new RarityCache
                                 {
@@ -167,7 +142,6 @@ namespace SuccessStory.Clients
                                     LastUpdated = DateTime.Now,
                                     TrophyRarities = new Dictionary<string, float>()
                                 };
-
                                 // Store rarity data
                                 if (exophaseAchievements?.Items != null)
                                 {
@@ -175,7 +149,6 @@ namespace SuccessStory.Clients
                                     {
                                         rarityCache.TrophyRarities[achievement.Name] = achievement.Percent;
                                     }
-
                                     // Only save cache if we actually got data
                                     if (rarityCache.TrophyRarities.Count > 0)
                                     {
@@ -189,25 +162,21 @@ namespace SuccessStory.Clients
                         {
                             Logger.Info($"Using cached trophy rarities for {game.Name}");
                         }
-
                         foreach (XElement trophyElement in trophyXml.Descendants("trophy"))
-                        {   
+                        {
                             string trophyId = trophyElement.Attribute("id")?.Value;
                             string trophyType = trophyElement.Attribute("ttype")?.Value;
                             bool isHidden = (trophyElement.Attribute("hidden")?.Value == "yes");
                             string name = trophyElement.Element("name")?.Value;
                             string description = trophyElement.Element("detail")?.Value;
-
                             // Check if trophy is unlocked
                             bool isUnlocked = trophyElement.Attribute("unlockstate") != null;
                             DateTime? unlockTime = null;
-
                             if (isUnlocked)
                             {
                                 string timestamp = trophyElement.Attribute("timestamp")?.Value;
                                 unlockTime = ConvertPS4Timestamp(timestamp);
                             }
-
                             // Calculate rarity/gamer score based on trophy type
                             float gamerScore = 15;
                             float rarity = 100;
@@ -235,7 +204,6 @@ namespace SuccessStory.Clients
                                     rarity = (float)PluginDatabase.PluginSettings.Settings.RarityUltraRare;
                                     break;
                             }
-
                             AllAchievements.Add(new Achievement
                             {
                                 ApiName = trophyId,
@@ -249,7 +217,6 @@ namespace SuccessStory.Clients
                                 UrlLocked = GetTrophyIconPath(trophyPath, trophyId, false)
                             });
                         }
-
                         gameAchievements.Items.AddRange(AllAchievements);
                     }
                 }
@@ -258,7 +225,6 @@ namespace SuccessStory.Clients
             {
                 ShowNotificationPluginNoConfiguration();
             }
-
             gameAchievements.SetRaretyIndicator();
             return gameAchievements;
         }
@@ -269,7 +235,6 @@ namespace SuccessStory.Clients
             if (CachedConfigurationValidationResult == null)
             {
                 CachedConfigurationValidationResult = IsConfigured();
-
                 if (!(bool)CachedConfigurationValidationResult)
                 {
                     ShowNotificationPluginNoConfiguration();
@@ -279,7 +244,6 @@ namespace SuccessStory.Clients
             {
                 ShowNotificationPluginErrorMessage(ExternalPlugin.SuccessStory);
             }
-
             return (bool)CachedConfigurationValidationResult;
         }
 
@@ -290,15 +254,13 @@ namespace SuccessStory.Clients
                 Logger.Warn("No ShadPS4 configured folder");
                 return false;
             }
-
-            string userGameDataPath = Path.Combine(PluginDatabase.PluginSettings.Settings.ShadPS4InstallationFolder, "user", "game_data");
+            string userGameDataPath = Path.Combine(PluginDatabase.PluginSettings.Settings.ShadPS4InstallationFolder, "game_data");
             userGameDataPath = Paths.FixPathLength(userGameDataPath);
             if (!Directory.Exists(userGameDataPath))
             {
-                Logger.Warn($"No ShadPS4 user/game_data folder in {PluginDatabase.PluginSettings.Settings.ShadPS4InstallationFolder}");
+                Logger.Warn($"No ShadPS4 game_data folder in {PluginDatabase.PluginSettings.Settings.ShadPS4InstallationFolder}");
                 return false;
             }
-
             return true;
         }
 
@@ -308,14 +270,12 @@ namespace SuccessStory.Clients
         }
         #endregion
 
-        #region ShadPS4        
+        #region ShadPS4
         private string FindGameTitleId(Game game)
         {
-            string userGameDataPath = Path.Combine(PluginDatabase.PluginSettings.Settings.ShadPS4InstallationFolder, "user", "game_data");
-
+            string userGameDataPath = Path.Combine(PluginDatabase.PluginSettings.Settings.ShadPS4InstallationFolder, "game_data");
             // Get all title ID folders
             DirectoryInfo[] titleDirectories = new DirectoryInfo(userGameDataPath).GetDirectories();
-
             foreach (DirectoryInfo dir in titleDirectories)
             {
                 // Check if this title ID folder contains trophy data
@@ -327,7 +287,6 @@ namespace SuccessStory.Clients
                         // Load the TROP.XML to verify if it's the correct game
                         XDocument trophyXml = XDocument.Load(trophyPath);
                         string gameName = trophyXml.Descendants("title-name").FirstOrDefault()?.Value.Trim();
-
                         // Compare game names
                         if (gameName?.Equals(game.Name, StringComparison.OrdinalIgnoreCase) ?? false)
                         {
@@ -340,7 +299,6 @@ namespace SuccessStory.Clients
                     }
                 }
             }
-
             Logger.Warn($"No trophy data found for {game.Name}");
             return null;
         }
@@ -352,26 +310,21 @@ namespace SuccessStory.Clients
                 // Trophy icons are in the Icons folder and follow TROP###.PNG format
                 string iconFileName = $"TROP{trophyId.PadLeft(3, '0')}.PNG";
                 string iconPath = Path.Combine(trophyPath, "trophy00", "Icons", iconFileName);
-
                 if (File.Exists(iconPath))
                 {
                     // The cache path will be like shadps4/CUSA#####/TROP000.PNG
                     string titleId = new DirectoryInfo(trophyPath).Parent.Name;
                     string cacheDir = Path.Combine(PluginDatabase.Paths.PluginUserDataPath, "shadps4", titleId);
-
                     // Create cache directory if it doesn't exist
                     FileSystem.CreateDirectory(cacheDir);
-
                     string targetPath = Path.Combine(cacheDir, iconFileName);
                     if (!File.Exists(targetPath))
                     {
                         FileSystem.CopyFile(iconPath, targetPath, false);
                     }
-
                     // Return relative path for the plugin's use
                     return Path.Combine("shadps4", titleId, iconFileName);
                 }
-
                 Logger.Warn($"Trophy icon not found: {iconPath}");
                 return null;
             }

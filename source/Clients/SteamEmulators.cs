@@ -134,7 +134,7 @@ namespace SuccessStory.Clients
             }
             else
             {
-                this.AppId = AppId != 0 ? AppId : steamApi.GetAppId(game);
+                this.AppId = AppId != 0 ? AppId : steamApi.GetAppId(game.GameId);
             }
 
             SteamEmulatorData data = Get(game, this.AppId, apiKey, IsManual);

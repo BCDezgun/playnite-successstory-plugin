@@ -1,4 +1,4 @@
-﻿using Playnite.SDK;
+using Playnite.SDK;
 using Playnite.SDK.Models;
 using Playnite.SDK.Data;
 using CommonPluginsShared;
@@ -164,23 +164,29 @@ namespace SuccessStory.Clients
 
             if (File.Exists(_xeniaLogFilePath))
             {
+                // Issue: logTimestamp is File.GetCreationTime. This gives the creation time of the log,
+                // not the exact time the achievement was unlocked. Xenia logs don't seem to include
+                // a precise timestamp per entry. If precise timestamps are critical, this is a limitation
+                // of the Xenia log itself. For now, we'll keep using this, as it's the best available.
                 DateTime logTimestamp = File.GetCreationTime(_xeniaLogFilePath);
 
                 foreach (var line in File.ReadAllLines(_xeniaLogFilePath))
                 {
-                    if (line.Contains("Achievement unlocked:"))
+                    // The new log format is "i> F8000008 Player: AGSG Unlocked Achievement: AchievementName"
+                    // We need to capture everything after "Unlocked Achievement:"
+                    Match match = Regex.Match(line, @"Unlocked Achievement:\s*(.+)");
+                    if (match.Success)
                     {
-                        var achievementName = line.Split(new[] { "Achievement unlocked:" }, StringSplitOptions.None)[1]
-                            .Replace("\r", "")
-                            .Replace("i> ", "")
-                            .Trim();
-
-                        achievementName = Regex.Replace(achievementName, @"i>\s+[A-F0-9]{8}", "");
+                        var achievementName = match.Groups[1].Value.Trim();
 
                         if (!string.IsNullOrEmpty(achievementName))
                         {
+                            // Using logTimestamp as before, due to Xenia log limitations
                             unlockedAchievements[achievementName] = logTimestamp;
 
+                            // The following logic handles writing to a separate .txt file for persistence
+                            // and to combine achievements from log and the text file.
+                            // This part seems fine, assuming 'achievementTextFile' is correctly named for the game.
                             if (!File.Exists(achievementTextFile))
                             {
                                 string entry = FormatAchievement(achievementName, logTimestamp);
