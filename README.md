@@ -10,6 +10,11 @@
 Extension for [Playnite](https://playnite.link).
 
 # Fix ShadPS4 support: remove 'user' from paths and update timestamp to Unix seconds
+<a href="https://github.com/BCDezgun/playnite-successstory-plugin/blob/master/screenshots/plugin_main_view_single_shadPS4.jpg?raw=true">
+  <picture>
+    <img alt="settings_01" src="https://github.com/BCDezgun/playnite-successstory-plugin/blob/master/screenshots/plugin_main_view_single_shadPS4.jpg?raw=true" height="150px">
+  </picture>
+</a>
 
 ## Fork by eFMann: Improving Steam Emulator Achievements
 
